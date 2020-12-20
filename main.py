@@ -4,6 +4,26 @@ import time
 # db
 from db_wrapper import DBWrapper
 
+import urllib.request
+import urllib.error
+
+
+# wait for internet connection
+def connect(host='http://google.com'):
+    try:
+        urllib.request.urlopen(host) #Python 3.x
+        return True
+    except urllib.error.URLError:
+        print('not connected to internet')
+        return False
+
+
+while True:
+    if connect():
+        break
+    time.sleep(5)
+
+
 db = DBWrapper()
 
 COM_PORT = '/dev/ttyACM0'    # 指定通訊埠名稱
@@ -33,22 +53,34 @@ while not ccs811.data_ready:
     pass
  
 
-while True:
-    while ser_tgs.in_waiting:  # 若收到序列資料…
-        data_raw = ser_tgs.readline()  # 讀取一行
-        if len(data_raw.decode().strip()) > 0:  # 用預設的UTF-8解碼
-            tvoc_tgs = int(data_raw.decode().split('\r')[0])
-        else:
-            continue
-        
-        # SDS011
-        data = ser_sds011.read(10)
-        unpacked = struct.unpack(UNPACK_PAT, data)
-        ts = datetime.now()
-        pm25 = unpacked[2] / 10.0
-        pm10 = unpacked[3] / 10.0
+def main():
+    while True:
+        while ser_tgs.in_waiting:  # 若收到序列資料…
+            data_raw = ser_tgs.readline()  # 讀取一行
+            if len(data_raw.decode().strip()) > 0:  # 用預設的UTF-8解碼
+                tvoc_tgs = int(data_raw.decode().split('\r')[0])
+            else:
+                continue
+            
+            # SDS011
+            data = ser_sds011.read(10)
+            unpacked = struct.unpack(UNPACK_PAT, data)
+            ts = datetime.now()
+            pm25 = unpacked[2] / 10.0
+            pm10 = unpacked[3] / 10.0
 
-        # CCS811
-        print("{} TVOC-CCS: {} PPB, TVOC-TGS: {}, PM2.5: {}, PM10: {}".format(ts, ccs811.tvoc, tvoc_tgs, pm25, pm10))
-        db.insert_data(ccs811.tvoc, tvoc_tgs, pm25, pm10)
-        time.sleep(1)
+            # CCS811
+            print("{} TVOC-CCS: {} PPB, TVOC-TGS: {}, PM2.5: {}, PM10: {}".format(ts, ccs811.tvoc, tvoc_tgs, pm25, pm10))
+            db.insert_data(ccs811.tvoc, tvoc_tgs, pm25, pm10)
+            time.sleep(1)
+
+
+if __name__ == '__main__':
+    while True:
+        try:
+            main()
+        except KeyboardInterrupt:
+            print('KeyboardInterrupt')
+            break
+        except Exception as e:
+            print(e)
